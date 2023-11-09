@@ -8,33 +8,61 @@ class Doc(html: String, private val spider: Spider) {
 
     private var jsoupDoc: Document = Jsoup.parse(html)
 
-    fun queryByCss(selector: String, handler: Ele?.() -> Unit) {
+    fun select(selector: String, handler: (Ele?.() -> Unit)? = null): Ele? {
         val jsoupEle = jsoupDoc.selectFirst(selector)
-        if (jsoupEle == null) {
-            handler(jsoupEle)
-        } else {
-            handler(Ele(jsoupEle, spider))
+        val ele = if (jsoupEle == null) null else Ele(jsoupEle, spider)
+        if (handler != null) {
+            handler(ele)
         }
+        return ele
     }
 
-    fun queryAllByCss(selector: String, handler: List<Ele>.(Spider) -> Unit) {
+    fun selectAll(selector: String, handler: (List<Ele>.() -> Unit)? = null): List<Ele> {
         val jsoupEles = jsoupDoc.select(selector)
-        if (jsoupEles.isEmpty()) {
-            handler(listOf(), spider)
-        } else {
-            val eleList = jsoupEles.map { Ele(it, spider) }.toList()
-            handler(eleList, spider)
+        val eleList = if (jsoupEles.isEmpty()) listOf() else jsoupEles.map { Ele(it, spider) }.toList()
+        if (handler != null) {
+            handler(eleList)
         }
+        return eleList
     }
 
-    fun addUrls(vararg urls: String, parse: Doc.(Spider) -> Unit) {
-        spider.addUrls(urls = urls, parse = parse)
+    fun follow(selector: String, attrName: String = "href", docHandler: DocHandler = spider.spiderDocHandler) {
+        select(selector) { this?.follow(attrName, docHandler) }
+    }
+
+    fun followAll(selector: String, attrName: String = "href", docHandler: DocHandler = spider.spiderDocHandler) {
+        selectAll(selector) {
+            forEach { it.follow(attrName, docHandler) }
+        }
     }
 }
 
-class Ele(val jsoupEle: Element, private val spider: Spider) {
+class Ele(private val jsoupEle: Element, private val spider: Spider) {
 
-    fun addUrls(vararg urls: String, parse: Doc?.(Spider) -> Unit) {
-        spider.addUrls(urls = urls, parse = parse)
+    fun follow(attrName: String = "abs:href", docHandler: DocHandler = spider.spiderDocHandler) {
+        val url = this.attr(attrName)
+        spider.addUrls(url, docHandler = docHandler)
+
+    }
+
+    fun ownText(): String {
+        return jsoupEle.ownText()
+    }
+
+    fun text(): String {
+        return jsoupEle.text()
+    }
+
+    fun attr(name: String): String {
+        return jsoupEle.attr(name)
+    }
+
+    fun hrefAttr(absolute: Boolean = true): String {
+        val attrName = if (absolute) "abs:href" else "href"
+        return jsoupEle.attr(attrName)
+    }
+
+    override fun toString(): String {
+        return jsoupEle.toString()
     }
 }

@@ -2,107 +2,125 @@ package site.derker.kspider
 
 import org.apache.logging.log4j.util.Supplier
 import org.slf4j.LoggerFactory
-import java.net.HttpURLConnection
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse.BodyHandlers
-import java.time.Duration
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 
-class Spider(vararg urls: String, parse: Doc.(Spider) -> Unit) {
-    private val log = LoggerFactory.getLogger("gutenberg")
-    private val httpClient = HttpClient.newBuilder()
-        .followRedirects(HttpClient.Redirect.NORMAL)
-        .connectTimeout(Duration.ofMillis(5000))
-        .build()
-    private val taskQueue: BlockingQueue<Task> = LinkedBlockingQueue()
-    private val workers: List<Thread> = List(8) { i -> Thread(::loop, "spider-worker-" + (i + 1)) }
-    private val lock = ReentrantLock()
-    private val condition = lock.newCondition()
-    private var state: State = State.IDLE
+/**
+ * @param {@link Int} http response statusCode
+ */
+typealias DocHandler = Doc.(Int) -> Unit
 
-    constructor(urlSupplier: Supplier<List<String>>, parse: Doc.(Spider) -> Unit) : this(
+enum class State {
+    IDLE,
+    RUNNING,
+    TERMINAL
+}
+
+data class Task(val url: String, val docHandler: DocHandler)
+
+class Spider(vararg urls: String, val spiderDocHandler: DocHandler) {
+    val controller: Controller = Controller("spider")
+    val taskQueue: BlockingQueue<Task> = LinkedBlockingQueue()
+    private var fetchers = MutableList(8) {
+        val thread = Thread(Fetcher(this), "fetcher-" + (it + 1))
+        thread.start()
+        return@MutableList thread
+    }
+
+    constructor(urlSupplier: Supplier<List<String>>, docHandler: DocHandler) : this(
         *urlSupplier.get().toTypedArray(),
-        parse = parse
+        spiderDocHandler = docHandler
     )
 
     init {
-        addUrls(urls = urls, parse = parse)
+        addUrls(urls = urls, docHandler = spiderDocHandler)
     }
 
-    fun addUrls(vararg urls: String, parse: (Doc, Spider) -> Unit) {
+    fun addUrls(vararg urls: String, docHandler: DocHandler = spiderDocHandler) {
         urls.forEach {
-            taskQueue.put(Task(it, parse))
+            taskQueue.put(Task(it, docHandler))
         }
     }
 
     fun start() {
-        if (state != State.TERMINAL) {
-            synchronized {
-                if (state != State.TERMINAL) {
-                    state = State.RUNNING
-                    condition.signal()
-                }
-            }
-        }
-        if (state == State.TERMINAL) {
-            log.warn("the spider had been terminal")
+        controller.start()
+    }
+
+    fun pause() {
+        controller.pause()
+    }
+
+    fun stop() {
+        controller.stop()
+    }
+}
+
+class Controller(private val name: String) {
+    private val lock = ReentrantLock()
+    private val condition = lock.newCondition()
+    private var state: State = State.IDLE
+
+    companion object {
+        private val log = LoggerFactory.getLogger(Companion::class.java)
+    }
+
+    fun start() {
+        doIfNotTerminal("start") {
+            state = State.RUNNING
+            condition.signalAll()
         }
     }
 
     fun pause() {
-        synchronized {
+        doIfNotTerminal("pause") {
             state = State.IDLE
-            condition.signal()
+            condition.signalAll()
         }
     }
 
     fun stop() {
         synchronized {
             state = State.TERMINAL
-            condition.signal()
+            condition.signalAll()
         }
     }
 
-    private fun loop() {
-        try {
-            while (state != State.TERMINAL) {
-                // poll task queue
-                while (state == State.RUNNING) {
-                    val task = taskQueue.poll(2, TimeUnit.SECONDS)
-                    if (task != null) {
-                        run(task)
-                    }
-                }
-                // idle
+    private fun doIfNotTerminal(operation: String, block: () -> Unit) {
+        val logWarning = {
+            log.warn("$operation failed. $name had been terminal")
+        }
+        if (state == State.TERMINAL) {
+            logWarning()
+            return
+        }
+        synchronized {
+            if (state == State.TERMINAL) {
+                logWarning()
+            } else {
+                block()
+            }
+        }
+    }
+
+    fun loop(block: () -> Unit) {
+        while (state != State.TERMINAL) {
+            // run util state is not running
+            while (state == State.RUNNING) {
+                block()
+            }
+            // idle if necessary
+            if (state == State.IDLE) {
                 synchronized {
-                    if (state != State.TERMINAL) {
-                        condition.await()
+                    if (state == State.IDLE) {
+                        try {
+                            condition.await()
+                        } catch (e: InterruptedException) {
+                            Thread.interrupted()
+                        }
                     }
                 }
             }
-        } catch (e: InterruptedException) {
-            Thread.interrupted()
-        } catch (e: Exception) {
-            log.error("worker occurs exception", e);
-        }
-    }
-
-    private fun run(task: Task) {
-        val req = HttpRequest.newBuilder()
-            .uri(URI.create(task.url))
-            .timeout(Duration.ofSeconds(5))
-            .build()
-        val resp = httpClient.send(req, BodyHandlers.ofString())
-        val body = resp.body()
-        if (resp.statusCode() == HttpURLConnection.HTTP_OK) {
-            task.parse(Doc(body, this), this)
-        } else {
-            log.error("${task.url} request failed, statusCode=${resp.statusCode()}, body=${body}")
         }
     }
 
@@ -116,12 +134,4 @@ class Spider(vararg urls: String, parse: Doc.(Spider) -> Unit) {
             lock.unlock()
         }
     }
-
-    enum class State {
-        IDLE,
-        RUNNING,
-        TERMINAL
-    }
 }
-
-data class Task(val url: String, val parse: (Doc, Spider) -> Unit)
