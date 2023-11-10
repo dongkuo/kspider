@@ -2,33 +2,32 @@ package site.derker.kspider
 
 import java.io.InputStream
 
-typealias Handler<T> = T.() -> Unit
-typealias HandlerWithData<T, D> = T.(D) -> Unit
+typealias Handler<T, R> = T.(R) -> Unit
 
 class Request {
 
 }
 
 class Response(val spider: Spider) {
-    fun html(handler: Handler<Document>?) {
+    fun html(handler: Handler<Document, Unit>?) {
         // parse response to document
     }
 
-    fun <D> htmlExtract(handlerWithData: HandlerWithData<Document, D>): D {
+    fun <D> htmlExtract(handlerWithData: Handler<Document, D>): D {
         TODO()
     }
 
-    fun stream(handler: Handler<InputStream>?) {
+    fun stream(handler: Handler<InputStream, Unit>?) {
         // parse response to document
     }
 
 }
 
 class ResponseFuture {
-    private var handler: Handler<*>? = null
-    private var response: Response? = null
+    var handler: Handler<*>? = null
+    var response: Response? = null
 
-    fun html(handler: Handler<Document>?) {
+    fun html(handler: Handler<Document, Unit>?) {
         if (handler == null) {
             return
         }
@@ -39,7 +38,7 @@ class ResponseFuture {
         }
     }
 
-    fun stream(handler: Handler<InputStream>?) {
+    fun stream(handler: Handler<InputStream, Unit>?) {
         if (handler == null) {
             return
         }
@@ -51,6 +50,9 @@ class ResponseFuture {
     }
 
     inline fun <reified D> htmlExtract(handler: HandlerWithData<Document, D>): D {
+        if (response == null) {
+            this.handler = handler
+        }
         with(D::class) {
             if (response == null) {
                 this.handler = handler
