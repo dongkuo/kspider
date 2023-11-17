@@ -40,7 +40,7 @@ class Spider(
         launch {
             addUrls(urls = startUrls, globalHandler)
         }
-        // launch fetcher coroutine
+        // launch fetcher
         repeat(options.fetcherNumber) {
             launch { fetch() }
         }
