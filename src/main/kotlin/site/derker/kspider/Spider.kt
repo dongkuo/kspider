@@ -1,10 +1,10 @@
 package site.derker.kspider
 
-import org.apache.logging.log4j.util.Supplier
 import org.slf4j.LoggerFactory
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.locks.ReentrantLock
+import java.util.function.Supplier
 
 /**
  * @param {@link Int} http response statusCode

@@ -2,8 +2,6 @@ package site.derker.kspider
 
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.*
-import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -13,6 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
+import java.io.File
 
 class KtorTests {
 
@@ -20,13 +19,13 @@ class KtorTests {
     val println: (String) -> Unit = log::info
 
     @Test
-    fun get() {
+    fun get1() {
         val client = HttpClient {
             followRedirects = true
             install(HttpTimeout)
         }
         runBlocking {
-            val response: HttpResponse = client.get("http://baidu.com") {
+            val response: HttpResponse = client.get("http://127.0.0.1") {
                 timeout {
                     requestTimeoutMillis = 400
                 }
@@ -37,23 +36,11 @@ class KtorTests {
     }
 
     @Test
-    fun test() {
+    fun get2() {
+        val client = HttpClient()
         runBlocking {
-            log.info("before")
-            doWorld()
-            log.info("after")
+            val httpResponse: HttpResponse = client.get("https://ktor.io/")
+            val stringBody: String = httpResponse.body<String>()
         }
-    }
-
-    private suspend fun doWorld() = coroutineScope {  // this: CoroutineScope
-        launch {
-            delay(2000L)
-            println("World 2")
-        }
-        launch {
-            delay(1000L)
-            println("World 1")
-        }
-        println("Hello")
     }
 }

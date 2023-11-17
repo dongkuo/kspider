@@ -1,68 +1,48 @@
 package site.derker.kspider
 
+import io.ktor.client.call.*
+import io.ktor.client.plugins.*
+import io.ktor.client.statement.*
+import io.ktor.util.reflect.*
+import kotlinx.coroutines.coroutineScope
 import java.io.InputStream
+import java.net.URI
+import java.net.URL
+import java.nio.charset.Charset
 
-typealias Handler<T, R> = T.(R) -> Unit
+typealias Handler<T> = T.() -> Unit
+typealias HandlerExtra<T, E> = T.(E) -> Unit
 
-class Request {
-
-}
-
-class Response(val spider: Spider) {
-    fun html(handler: Handler<Document, Unit>?) {
-        // parse response to document
-    }
-
-    fun <D> htmlExtract(handlerWithData: Handler<Document, D>): D {
-        TODO()
-    }
-
-    fun stream(handler: Handler<InputStream, Unit>?) {
-        // parse response to document
-    }
+class Request(val url: URL, var method: String) {
 
 }
 
-class ResponseFuture {
-    var handler: Handler<*>? = null
-    var response: Response? = null
+class HttpResponseException(message: String?) : RuntimeException(message)
 
-    fun html(handler: Handler<Document, Unit>?) {
-        if (handler == null) {
-            return
-        }
-        if (response == null) {
-            this.handler = handler
-        } else {
-            this.response!!.html(handler)
-        }
+class Response(
+    val request: Request,
+    private val response: HttpResponse,
+) {
+    fun html(handler: Handler<Document>) {
+        val value = response.status.value
     }
 
-    fun stream(handler: Handler<InputStream, Unit>?) {
-        if (handler == null) {
-            return
-        }
-        if (response == null) {
-            this.handler = handler
-        } else {
-            this.response!!.stream(handler)
-        }
+    fun text(handler: Handler<String>?) {
     }
 
-    inline fun <reified D> htmlExtract(handler: HandlerWithData<Document, D>): D {
-        if (response == null) {
-            this.handler = handler
-        }
-        with(D::class) {
-            if (response == null) {
-                this.handler = handler
-            } else {
-                this.response!!.stream(handler)
-            }
-        }
+    inline fun <reified T> htmlExtract(handlerWithData: HandlerExtra<Document, T>): T {
+        val data = T::class.constructors.first().call()
+        return data
     }
 
-    fun callback(response: Response) {
-        TODO("Not yet implemented")
+    fun stream(handler: Handler<InputStream>?) {
+    }
+
+    fun header(name: String): String? {
+        return response.headers[name]
+    }
+
+    fun statusCode(): Int {
+        return response.status.value
     }
 }

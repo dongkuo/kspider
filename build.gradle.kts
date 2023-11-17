@@ -28,6 +28,7 @@ dependencies {
     implementation("io.ktor:ktor-client-core:2.3.6")
     implementation("io.ktor:ktor-client-okhttp:2.3.6")
     implementation("io.ktor:ktor-client-java:2.3.6")
+    testImplementation(kotlin("test"))
 }
 
 tasks.test {

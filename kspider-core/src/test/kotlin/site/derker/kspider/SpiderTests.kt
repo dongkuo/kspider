@@ -12,42 +12,26 @@ class SpiderTests {
                 var element2 = xpath("//")
                 var elements2 = xpathAll("//")
 
-                follow(".class") { // this: Response
-                    html {
-
+                follow(".class") {
+                    var data: MyData = htmlExtract<MyData> { // this: Response, it: MyData
+                        it.url = this@follow.request.uri.toString()
+                        it.statusCode = this@follow.statusCode()
+                        it.title = css("#title")?.text()
                     }
+                }
 
+                follow(xpath = ".class") { // this: Document
+                    // for downloading file
                     stream {
 
-                    }
-
-                    val data = htmlExtract<MyData> {
-
-                    }
-                }
-
-                follow(xpath = ".class").html { // this: Document
-                }
-
-                // for downloading file
-                follow(css(".class")).stream { // this: InputStream
-
-                }
-
-                // for extracting data
-                var data: MyData = follow("#id").htmlExtract<MyData> { // this: Response, it: MyData
-                    it.url = request.url
-                    it.statusCode = statusCode
-                    html {
-                        it.title = css("#title")?.text()
                     }
                 }
             }
         }
-        spider.start(stopAfterFinishing = true)
-        spider.pause()
-        spider.resume()
-        spider.stop()
+//        spider.start(stopAfterFinishing = true)
+//        spider.pause()
+//        spider.resume()
+//        spider.stop()
     }
 }
 
