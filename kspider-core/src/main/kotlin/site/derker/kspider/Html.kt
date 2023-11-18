@@ -7,40 +7,44 @@ typealias InnerElement = org.jsoup.nodes.Element
 
 class Document(
     html: String,
-    baseUri: String,
+    baseUrl: String,
     private val spider: Spider
 ) : Selector {
 
     private val innerDocument: InnerDocument
 
     init {
-        innerDocument = Jsoup.parse(html, baseUri)
+        innerDocument = Jsoup.parse(html, baseUrl)
     }
 
-    fun follow(
+    suspend fun follow(
         css: String? = null,
         xpath: String? = null,
         extract: Extract = attribute("href"),
         handler: Handler<Response>? = null
     ) {
         if (css != null) {
-            follow(css(css), extract, handler)
+            follow(cssAll(css), extract, handler)
         }
         if (xpath != null) {
-            follow(xpath(xpath), extract, handler)
+            follow(xpathAll(xpath), extract, handler)
         }
     }
 
-    fun follow(
+    suspend fun follow(
         element: Element?,
         extract: Extract = attribute("href"),
         handler: Handler<Response>? = null
     ) {
         val url = element.let(extract) ?: return
-        spider.addUrls(url, handler = handler)
+        if (handler == null) {
+            spider.addUrls(url)
+        } else {
+            spider.addUrls(url, handler = handler)
+        }
     }
 
-    fun follow(
+    suspend fun follow(
         elements: List<Element>,
         extract: Extract = attribute("href"),
         responseHandler: Handler<Response>? = null

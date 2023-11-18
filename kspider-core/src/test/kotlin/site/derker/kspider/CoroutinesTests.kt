@@ -1,6 +1,7 @@
 package site.derker.kspider
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.produce
 import kotlinx.coroutines.flow.Flow
@@ -10,14 +11,11 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.lang.RuntimeException
-import java.util.concurrent.TimeUnit
 import kotlin.system.measureTimeMillis
-import kotlin.time.Duration.Companion.seconds
 
 class CoroutinesTests {
 
-    private val log: Logger = LoggerFactory.getLogger("CoroutinesTeests")
+    private val log: Logger = LoggerFactory.getLogger("CoroutinesTests")
 
     @Test
     fun testDeferred() = runBlocking {
@@ -139,5 +137,50 @@ class CoroutinesTests {
 
     fun CoroutineScope.square(numbers: ReceiveChannel<Int>): ReceiveChannel<Int> = produce {
         for (x in numbers) send(x * x)
+    }
+
+    @Test
+    fun test6() {
+        val channel = Channel<Unit>(1)
+        runBlocking {
+            launch {
+                log.info("send1 before")
+                channel.send(Unit)
+                log.info("send1 after")
+
+                log.info("send2 before")
+                channel.send(Unit)
+                log.info("send2 after")
+
+                log.info("trySend before")
+                channel.trySend(Unit)
+                log.info("trySend after")
+            }
+            launch {
+                delay(2000)
+                log.info("receive1: ${channel.receive()}")
+            }
+//            launch {
+//                withTimeoutOrNull(4000) {
+//                    log.info("receive2: ${channel.receive()}")
+//                }
+//            }
+        }
+    }
+
+    @Test
+    fun test7() {
+        runBlocking {
+            val job = launch {
+                var i = 1;
+                while (true) {
+                    log.info("hello$i")
+                    i++
+                    delay(1000)
+                }
+            }
+            delay(3000)
+            job.cancel()
+        }
     }
 }
