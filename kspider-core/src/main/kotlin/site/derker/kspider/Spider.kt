@@ -1,5 +1,6 @@
 package site.derker.kspider
 
+import Handler
 import io.ktor.client.*
 import io.ktor.client.plugins.*
 import io.ktor.client.request.*
@@ -28,7 +29,6 @@ enum class State {
 
 data class Task(val url: String, val handler: Handler<Response>)
 
-private val log: Logger = LoggerFactory.getLogger(Spider::class.java)
 
 class Spider(
     vararg startUrls: String,
@@ -41,8 +41,9 @@ class Spider(
     }
     private val state = AtomicReference(State.NEW)
     private val parentJob = Job()
-    private val signalChannel: Channel<Unit> = Channel(1)
     private val taskChannel: Channel<Task> = Channel(Channel.UNLIMITED)
+    val log: Logger = LoggerFactory.getLogger(options.spiderName)
+
     override val coroutineContext: CoroutineContext
         get() = parentJob + Dispatchers.Default
 
@@ -133,17 +134,18 @@ class Spider(
                     isIdle = true
                     val task = spider.taskChannel.receive()
                     isIdle = false
-                    log.debug("fetch: ${task.url}")
-                    val response = spider.httpClient.get(task.url) {
+                    spider.log.debug("fetch ${task.url}")
+                    val httpStatement = spider.httpClient.prepareGet(task.url) {
                         timeout {
                             connectTimeoutMillis = spider.options.connectTimeoutMillis
                             requestTimeoutMillis = spider.options.requestTimeoutMillis
                             socketTimeoutMillis = spider.options.socketTimeoutMillis
                         }
                     }
-                    log.debug("response: url={}, statusCode: {}", response.call.request.url, response.status.value)
-                    val request = Request(URI.create(task.url).toURL(), "GET")
-                    task.handler.invoke(Response(request, response, spider))
+                    httpStatement.execute {
+                        val request = Request(URI.create(task.url).toURL(), "GET")
+                        task.handler.invoke(Response(request, it, spider))
+                    }
                 }
             }
         }

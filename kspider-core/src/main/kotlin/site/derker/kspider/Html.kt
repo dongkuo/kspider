@@ -1,5 +1,6 @@
 package site.derker.kspider
 
+import Handler
 import org.jsoup.Jsoup
 
 typealias InnerDocument = org.jsoup.nodes.Document
@@ -9,7 +10,7 @@ class Document(
     html: String,
     baseUrl: String,
     private val spider: Spider
-) : Selector {
+) : Selectable {
 
     private val innerDocument: InnerDocument
 
@@ -20,23 +21,31 @@ class Document(
     suspend fun follow(
         css: String? = null,
         xpath: String? = null,
-        extract: Extract = attribute("href"),
+        extractor: Extractor = attribute("href"),
         handler: Handler<Response>? = null
     ) {
         if (css != null) {
-            follow(cssAll(css), extract, handler)
+            follow(cssAll(css), extractor, handler)
         }
         if (xpath != null) {
-            follow(xpathAll(xpath), extract, handler)
+            follow(xpathAll(xpath), extractor, handler)
         }
     }
 
     suspend fun follow(
-        element: Element?,
-        extract: Extract = attribute("href"),
+        extractableList: List<Extractable>,
+        extractor: Extractor = attribute("href"),
+        responseHandler: Handler<Response>? = null
+    ) {
+        extractableList.forEach { follow(it, extractor, responseHandler) }
+    }
+
+    suspend fun follow(
+        extractable: Extractable?,
+        extractor: Extractor = attribute("href"),
         handler: Handler<Response>? = null
     ) {
-        val url = element.let(extract) ?: return
+        val url = extractable.let(extractor) ?: return
         if (handler == null) {
             spider.addUrls(url)
         } else {
@@ -44,12 +53,8 @@ class Document(
         }
     }
 
-    suspend fun follow(
-        elements: List<Element>,
-        extract: Extract = attribute("href"),
-        responseHandler: Handler<Response>? = null
-    ) {
-        elements.forEach { follow(it, extract, responseHandler) }
+    fun title(): String {
+        return innerDocument.title()
     }
 
     override fun css(selector: String): Element? {
@@ -90,7 +95,7 @@ class Document(
     }
 }
 
-class Element(private val innerElement: InnerElement) : Selector, Extractor {
+class Element(private val innerElement: InnerElement) : Selectable, Extractable {
     override fun css(selector: String): Element? {
         return innerElement.selectFirst(selector)?.let { Element(it) }
     }
@@ -149,7 +154,7 @@ class Element(private val innerElement: InnerElement) : Selector, Extractor {
     }
 }
 
-interface Selector {
+interface Selectable {
     fun css(selector: String): Element?
     fun cssAll(selector: String): List<Element>
     fun xpath(selector: String): Element?
@@ -160,7 +165,7 @@ interface Selector {
     fun children(): List<Element>
 }
 
-interface Extractor {
+interface Extractable {
     fun tag(): String?
     fun html(onlyInner: Boolean = false): String?
     fun text(onlyOwn: Boolean = false): String?
@@ -168,9 +173,9 @@ interface Extractor {
 }
 
 
-typealias Extract = (Extractor?) -> String?
+typealias Extractor = (Extractable?) -> String?
 
-fun tag(): Extract = { it?.tag() }
-fun html(): Extract = { it?.html() }
-fun attribute(name: String): Extract = { it?.attribute(name) }
-fun text(): Extract = { it?.text() }
+fun tag(): Extractor = { it?.tag() }
+fun html(): Extractor = { it?.html() }
+fun attribute(name: String): Extractor = { it?.attribute(name) }
+fun text(): Extractor = { it?.text() }

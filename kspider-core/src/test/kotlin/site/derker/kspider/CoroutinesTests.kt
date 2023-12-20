@@ -183,4 +183,45 @@ class CoroutinesTests {
             job.cancel()
         }
     }
+
+    @Test
+    fun test8() {
+        runBlocking {
+            val channel = Channel<Int>()
+            launch {
+                for (x in 1..5) {
+                    channel.send(x * x)
+                    delay(1000)
+                }
+                delay(3000)
+                channel.close() // we're done sending
+            }
+            // here we print received values using `for` loop (until the channel is closed)
+            for (y in channel) log.info("$y")
+            log.info("Done!")
+        }
+    }
+
+    fun CoroutineScope.numbersFrom(start: Int) = produce<Int> {
+        var x = start
+        while (true) send(x++) // infinite stream of integers from start
+    }
+
+    fun CoroutineScope.filter(numbers: ReceiveChannel<Int>, prime: Int) = produce<Int> {
+        for (x in numbers) {
+            if (x % prime != 0) {
+                send(x)
+            }
+        }
+    }
+
+    @Test
+    fun test9() = runBlocking {
+        var cur = numbersFrom(2)
+        repeat(10) {
+            val prime = cur.receive()
+            println(prime)
+            cur = filter(cur, prime)
+        }
+    }
 }

@@ -5,10 +5,8 @@ import io.ktor.client.call.*
 import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import io.ktor.utils.io.jvm.javaio.*
+import kotlinx.coroutines.*
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -25,12 +23,15 @@ class KtorTests {
             install(HttpTimeout)
         }
         runBlocking {
-            val response: HttpResponse = client.get("http://127.0.0.1") {
-                timeout {
-                    requestTimeoutMillis = 400
-                }
+            val response: HttpResponse = client.get("https://www.cnblogs.com/dongkuo")
+            launch(Dispatchers.Default) {
+                println(response.body<String>())
+                println("==============body===================")
             }
-            println(response.body<String>())
+            launch(Dispatchers.Default) {
+                println(response.bodyAsChannel().toInputStream())
+                println("==============toInputStream===================")
+            }
         }
         println("after runBlocking")
     }
