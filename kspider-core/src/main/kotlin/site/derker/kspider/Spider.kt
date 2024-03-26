@@ -1,6 +1,5 @@
 package site.derker.kspider
 
-import Handler
 import io.ktor.client.*
 import io.ktor.client.plugins.*
 import io.ktor.client.request.*
@@ -29,11 +28,18 @@ enum class State {
 
 data class Task(val url: String, val handler: Handler<Response>)
 
+@DslMarker
+@Target(AnnotationTarget.CLASS, AnnotationTarget.TYPE)
+annotation class SpiderDsl
+
+typealias Handler<T> = suspend (@SpiderDsl T).() -> Unit
+typealias ExtraHandler<T, E> = suspend (@SpiderDsl T).(E) -> Unit
+
 
 class Spider(
     vararg startUrls: String,
     private val options: Options = Options(),
-    private val globalHandler: Handler<Response>
+    private val defaultHandler: Handler<Response>
 ) : CoroutineScope {
     private val httpClient = HttpClient {
         followRedirects = true
@@ -50,7 +56,7 @@ class Spider(
     init {
         // add start urls
         launch {
-            addUrls(urls = startUrls, globalHandler)
+            addUrls(urls = startUrls, defaultHandler)
         }
     }
 
@@ -115,7 +121,7 @@ class Spider(
         }
     }
 
-    suspend fun addUrls(vararg urls: String, handler: Handler<Response> = globalHandler) {
+    suspend fun addUrls(vararg urls: String, handler: Handler<Response> = defaultHandler) {
         urls.forEach {
             log.debug("add url: $it")
             taskChannel.send(Task(it, handler))
@@ -128,7 +134,7 @@ class Spider(
 
         private var job: Job? = null
 
-        suspend fun start() = coroutineScope {
+        suspend fun start() = withContext(spider.coroutineContext) {
             job = launch(CoroutineName("${spider.options.spiderName}-fetcher")) {
                 while (true) {
                     isIdle = true

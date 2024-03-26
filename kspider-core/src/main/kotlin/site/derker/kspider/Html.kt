@@ -1,6 +1,5 @@
 package site.derker.kspider
 
-import Handler
 import org.jsoup.Jsoup
 
 typealias InnerDocument = org.jsoup.nodes.Document

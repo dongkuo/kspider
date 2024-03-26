@@ -1,7 +1,5 @@
 package site.derker.kspider
 
-import Handler
-import ExtraHandler
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.utils.io.*
