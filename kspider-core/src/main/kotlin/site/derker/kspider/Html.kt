@@ -45,11 +45,7 @@ class Document(
         handler: Handler<Response>? = null
     ) {
         val url = extractable.let(extractor) ?: return
-        if (handler == null) {
-            spider.addUrls(url)
-        } else {
-            spider.addUrls(url, handler = handler)
-        }
+        spider.addUrls(url, handler = handler)
     }
 
     fun title(): String {

@@ -26,7 +26,7 @@ enum class State {
     TERMINAL
 }
 
-data class Task(val url: String, val handler: Handler<Response>)
+data class Task(val url: String, val handler: Handler<Response>?)
 
 @DslMarker
 @Target(AnnotationTarget.CLASS, AnnotationTarget.TYPE)
@@ -121,7 +121,7 @@ class Spider(
         }
     }
 
-    suspend fun addUrls(vararg urls: String, handler: Handler<Response> = defaultHandler) {
+    suspend fun addUrls(vararg urls: String, handler: Handler<Response>?) {
         urls.forEach {
             log.debug("add url: $it")
             taskChannel.send(Task(it, handler))
@@ -150,7 +150,7 @@ class Spider(
                     }
                     httpStatement.execute {
                         val request = Request(URI.create(task.url).toURL(), "GET")
-                        task.handler.invoke(Response(request, it, spider))
+                        task.handler?.invoke(Response(request, it, spider))
                     }
                 }
             }
